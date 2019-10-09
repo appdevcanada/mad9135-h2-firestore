@@ -1,28 +1,5 @@
 $(document).ready(function () {
-    //get all the data on app startup
-    loadData();
-
-    function loadData() {
-        cat.get().then(function (querySnapshot) {
-            loadCategories(querySnapshot)
-        });
-    }
-
-    function loadCategories(querySnapshot) {
-        var table = '';
-        querySnapshot.forEach(function (doc) {
-            var document = doc.data();
-            document.titles.forEach(function (title) {
-                table += '<tr>';
-                table += '<td class="fname">' + doc.id + '</td>';
-                table += '<td class="lname">' + title + '</td>';
-                table += '<td class="editEmployee" style="text-align:center;"><i class="fa fa-pencil" aria-hidden="true" style="color:blue;"></i></td>';
-                table += '<td class="deleteEmployee" style="text-align:center;"><i class="fa fa-trash" aria-hidden="true" style="color:red;"></i></td>';
-                table += '</tr>';
-            })
-        });
-        $('tbody.tbodyData').html(table);
-    }
+    var docTitle = "";
 
     $('#createEmployee').click(function () {
         $('.employeeForm').css("display", "block");
@@ -36,31 +13,37 @@ $(document).ready(function () {
 
         //check if you need to create or update an employee
         if ($(this).text() == "Save Changes") {
-            var docCat = fname;
-            db.collection("categories").doc(docCat).set({
-                titles: [lname]
-            }).then(function (docRef) {
-                $('#operationStatus').html('<div class="alert alert-success"><strong>Success! </strong> Category/Item created</div>');
-                $('.employeeForm').css('display', 'none');
-                loadData();
-            });
-        }
-        else {
-            var docCat = fname;
-            db.collection("categories").doc(docCat).set({
-                titles: [lname]
-            }, merge = true
-            ).then(function (docRef) {
-                $('#operationStatus').html('<div class="alert alert-success"><strong>Success! </strong> Category/Item updated</div>');
-                $('.employeeForm').css('display', 'none');
-                loadData();
-            });
+
+            var docRef = cat.doc(fname);
+            var itemList = [];
+
+            docRef.get().then(function (item) {
+                if (item.data()) {
+                    itemList = item.data().titles
+                }
+                itemList.push(lname);
+                docRef.set({ titles: itemList })
+                    // docRef.update({ titles: firebase.firestore.FieldValue.arrayUnion(lname) })
+                    .then(function () {
+                        $('#operationStatus').html('<div class="alert alert-success"><strong>Success! </strong> Item or/and Category created</div>');
+                        console.log("Document successfully written!");
+                    })
+                    .catch(function (error) {
+                        console.error("Error writing document: ", error);
+                    });
+                closeForm();
+                console.log("here 2...");
+            }).catch(function (error) {
+                $('#operationStatus').html('<div class="alert alert-danger"><strong>Failure! </strong> Category/Item NOT created with Error: ' + error.message + '</div>');
+            })
+        } else {
+            updateArray();
         }
     });
 
     // Cancel the Employee form
     $('#cancel').click(function () {
-        $('.employeeForm').css("display", "none");
+        closeForm();
     });
 
     // Get the data of the employee you want to edit
@@ -70,11 +53,7 @@ $(document).ready(function () {
 
         $("#fname").val($(this).closest('tr').find('.fname').text());
         $("#lname").val($(this).closest('tr').find('.lname').text());
-        $("#email").val($(this).closest('tr').find('.email').text());
-        $("#age").val($(this).closest('tr').find('.age').text());
-        $("#gender").val($(this).closest('tr').find('.gender').text());
-        $("#yearsOfExperience").val($(this).closest('tr').find('.yearsofexperience').text());
-        $("#isFullTime").prop('checked', $(this).closest('tr').find('.isfulltime').text() === 'true');
+        docTitle = $("#lname").val();
     });
 
     // Delete employee
@@ -83,15 +62,45 @@ $(document).ready(function () {
         var fName = $(this).closest('tr').find('.fname').text(); //Category
         var lName = $(this).closest('tr').find('.lname').text(); //Item
 
-        db.collection('categories').doc(fName).delete().then(function () {
+        var docRef = cat.doc(fName);
+
+        docRef.get().then(function (item) {
+            docRef.update({ titles: firebase.firestore.FieldValue.arrayRemove(lName) });
             $('#operationStatus').html('<div class="alert alert-success"><strong>Success! </strong> Item or/and Category deleted</div>');
-            loadData();
+            console.log(item.data().titles.length);
+            if (item.data().titles.length == 1) {
+                docRef.delete();
+            }
         }).catch(function (error) {
             $('#operationStatus').html('<div class="alert alert-danger"><strong>Failure! </strong> Category/Item NOT deleted with Error: ' + error.message + '</div>');
         })
     });
 
-    $("#searchEmployee").change(function () {
-        console.log('You entered: ', $(this).val());
-    });
+    function closeForm() {
+        $("#fname").val("");
+        $("#lname").val("");
+        $('.employeeForm').css("display", "none");
+    }
+
+    async function updateArray() {
+        var fname = $("#fname").val();
+        var lname = $("#lname").val();
+        var docRef = cat.doc(fname);
+        await docRef.get()
+            .then(function (item) {
+                var document = item.data().titles;
+                document.forEach(function (title) {
+                    if (title == docTitle) {
+                        docRef.update({ titles: firebase.firestore.FieldValue.arrayRemove(docTitle) });
+                        docRef.update({ titles: firebase.firestore.FieldValue.arrayUnion(lname) });
+                    };
+                })
+                docTitle = "";
+                $('#operationStatus').html('<div class="alert alert-success"><strong>Success! </strong> Category/Item updated</div>');
+                closeForm();
+            })
+            .catch(function (error) {
+                $('#operationStatus').html('<div class="alert alert-danger"><strong>Failure! </strong> Category/Item NOT updated with Error: ' + error.message + '</div>');
+            })
+    }
 });

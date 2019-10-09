@@ -16,7 +16,7 @@
 
 div.dropdown-menu a{
     cursor: pointer;
-} 
+}
 
 td.deleteEmployee{
     cursor: pointer;
@@ -24,4 +24,8 @@ td.deleteEmployee{
 
 td.editEmployee{
     cursor: pointer;
+}
+
+#searchEmployee {
+    margin-right: 5px;
 }
